@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/wakeful/kafka_connect_exporter/env"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -16,16 +17,12 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-const nameSpace = "kafka_connect"
+const nameSpace = "kafka"
 
 var (
-	version    = "dev"
-	versionUrl = "https://github.com/wakeful/kafka_connect_exporter"
-
-	showVersion   = flag.Bool("version", false, "show version and exit")
-	listenAddress = flag.String("listen-address", ":8080", "Address on which to expose metrics.")
-	metricsPath   = flag.String("telemetry-path", "/metrics", "Path under which to expose metrics.")
-	scrapeURI     = flag.String("scrape-uri", "http://127.0.0.1:8080", "URI on which to scrape kafka connect.")
+	version     = "dev"
+	versionURL  = "https://github.com/90poe/kafka_connect_exporter"
+	showVersion = flag.Bool("version", false, "show version and exit")
 
 	isConnectorRunning = prometheus.NewDesc(
 		prometheus.BuildFQName(nameSpace, "connector", "state_running"),
@@ -47,13 +44,13 @@ type status struct {
 
 type connector struct {
 	State    string `json:"state"`
-	WorkerId string `json:"worker_id"`
+	WorkerID string `json:"worker_id"`
 }
 
 type task struct {
 	State    string  `json:"state"`
-	Id       float64 `json:"id"`
-	WorkerId string  `json:"worker_id"`
+	ID       float64 `json:"id"`
+	WorkerID string  `json:"worker_id"`
 }
 
 type Exporter struct {
@@ -119,31 +116,31 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		var connectorStatus status
-		if err := json.Unmarshal(connectorStatusOutput, &connectorStatus); err != nil {
+		if err := json.Unmarshal(connectorStatusOutput, &connectorStatus); err != nil {        						//nolint
 			log.Errorf("Can't decode response for: %v", err)
 			continue
 		}
 
-		var isRunning float64 = 0
+		var isRunning float64
 		if strings.ToLower(connectorStatus.Connector.State) == "running" {
 			isRunning = 1
 		}
 
 		ch <- prometheus.MustNewConstMetric(
 			isConnectorRunning, prometheus.GaugeValue, isRunning,
-			connectorStatus.Name, strings.ToLower(connectorStatus.Connector.State), connectorStatus.Connector.WorkerId,
+			connectorStatus.Name, strings.ToLower(connectorStatus.Connector.State), connectorStatus.Connector.WorkerID,
 		)
 
 		for _, connectorTask := range connectorStatus.Tasks {
 
-			var isTaskRunning float64 = 0
+			var isTaskRunning float64
 			if strings.ToLower(connectorTask.State) == "running" {
 				isTaskRunning = 1
 			}
 
 			ch <- prometheus.MustNewConstMetric(
 				areConnectorTasksRunning, prometheus.GaugeValue, isTaskRunning,
-				connectorStatus.Name, strings.ToLower(connectorTask.State), connectorTask.WorkerId, fmt.Sprintf("%d", int(connectorTask.Id)),
+				connectorStatus.Name, strings.ToLower(connectorTask.State), connectorTask.WorkerID, fmt.Sprintf("%d", int(connectorTask.ID)),
 			)
 		}
 
@@ -153,7 +150,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	return
+	return																											//nolint
 }
 
 func NewExporter(uri string) *Exporter {
@@ -185,11 +182,11 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("kafka_connect_exporter\n url: %s\n version: %s\n", versionUrl, version)
+		fmt.Printf("kafka_connect_exporter\n url: %s\n version: %s\n", versionURL, version)
 		os.Exit(2)
 	}
 
-	parseURI, err := url.Parse(*scrapeURI)
+	parseURI, err := url.Parse(env.Settings.ScrapeURI)
 	if err != nil {
 		log.Errorf("%v", err)
 		os.Exit(1)
@@ -203,13 +200,13 @@ func main() {
 
 	prometheus.Unregister(prometheus.NewGoCollector())
 	prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	prometheus.MustRegister(NewExporter(*scrapeURI))
+	prometheus.MustRegister(NewExporter(env.Settings.ScrapeURI))
 
-	http.Handle(*metricsPath, promhttp.Handler())
+	http.Handle(env.Settings.TelemetryPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, *metricsPath, http.StatusMovedPermanently)
+		http.Redirect(w, r, env.Settings.TelemetryPath, http.StatusMovedPermanently)
 	})
 
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	log.Fatal(http.ListenAndServe(env.Settings.ListenAddress, nil))
 
 }
