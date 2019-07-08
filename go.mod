@@ -1,4 +1,4 @@
-module github.com/wakeful/kafka_connect_exporter
+module github.com/90poe/kafka_connect_exporter
 
 go 1.12
 

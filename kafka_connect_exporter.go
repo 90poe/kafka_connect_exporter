@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/wakeful/kafka_connect_exporter/env"
+	"github.com/90poe/kafka_connect_exporter/env"
 	"io/ioutil"
 	"net/http"
 	"net/url"

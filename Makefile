@@ -1,8 +1,9 @@
 SHELL=/bin/bash
 VERSION=$(git describe --tags --dirty)
+IMAGE_TAG := $(shell git rev-parse HEAD)
 
 .PHONY: all
-all: deps lint unit_test build system_test
+all: deps lint unit_test build dockerise
 
 .PHONY: build
 build:
@@ -18,7 +19,7 @@ unit_test:
 
 .PHONY: dockerise
 dockerise:
-	docker build -t "quay.io/90poe/kafka_connect_exporter:${VERSION}" .
+	docker build -t "quay.io/90poe/kafka_connect_exporter:${IMAGE_TAG}" .
 
 .PHONY: lint
 lint:
