@@ -5,16 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"github.com/90poe/kafka_connect_exporter/env"
+	"github.com/90poe/service-chassis/health"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/log"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
 )
 
 const nameSpace = "kafka"
@@ -116,7 +117,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		var connectorStatus status
-		if err := json.Unmarshal(connectorStatusOutput, &connectorStatus); err != nil {        						//nolint
+		if err := json.Unmarshal(connectorStatusOutput, &connectorStatus); err != nil { //nolint
 			log.Errorf("Can't decode response for: %v", err)
 			continue
 		}
@@ -150,7 +151,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	return																											//nolint
+	return //nolint
 }
 
 func NewExporter(uri string) *Exporter {
@@ -186,6 +187,11 @@ func main() {
 		os.Exit(2)
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	checks := []func() error{}
+	health.ConnectHealthCheckService(wg, health.DefaultPort, checks, checks)
+
 	parseURI, err := url.Parse(env.Settings.ScrapeURI)
 	if err != nil {
 		log.Errorf("%v", err)
@@ -207,6 +213,11 @@ func main() {
 		http.Redirect(w, r, env.Settings.TelemetryPath, http.StatusMovedPermanently)
 	})
 
-	log.Fatal(http.ListenAndServe(env.Settings.ListenAddress, nil))
-
+	//log.Fatal(http.ListenAndServe(env.Settings.ListenAddress, nil))
+	wg.Add(1)
+	go func() {
+		log.Fatal(http.ListenAndServe(env.Settings.ListenAddress, nil))
+		wg.Done()
+	}()
+	wg.Wait()
 }

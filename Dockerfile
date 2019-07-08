@@ -11,15 +11,14 @@ WORKDIR $GOPATH/src/github.com/90poe/kafka_connect_exporter/
 # Using go mod.
 # RUN go mod download
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o /go/bin/kafka_connect_exporter -ldflags="-s -w" && \
-    upx --brute /go/bin/svc
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o /go/bin/kafka_connect_exporter -ldflags="-s -w"
 
 
 ############################
 # STEP 2 build a small image
 ############################
 
-FROM scratch
+FROM alpine
 
 # Import from builder.
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
